@@ -65,8 +65,8 @@ pipeline {
                     sshagent(['ec2-ssh-key']) {
 
                         sh '''
-                        ssh -o StrictHostKeyChecking=no ubuntu@ec2-3-227-20-198.compute-1.amazonaws.com << EOF
-
+                        ssh -o StrictHostKeyChecking=no ubuntu@ec2-3-227-20-198.compute-1.amazonaws.com '
+                        
                         cd ~/ai-chat
 
                         echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
@@ -75,12 +75,12 @@ pipeline {
                         docker compose down
                         docker compose up -d
 
-                        EOF
+                        '
                         '''
                     }
                 }
             }
-     }
+        }
 
         stage('Cleanup') {
             steps {
