@@ -67,7 +67,7 @@ pipeline {
                         sh '''
                         ssh -o StrictHostKeyChecking=no ubuntu@ec2-3-227-20-198.compute-1.amazonaws.com << EOF
 
-                        cd ~/ai-chat-app
+                        cd ~/ai-chat
 
                         echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
 
