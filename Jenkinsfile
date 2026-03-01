@@ -33,54 +33,54 @@ pipeline {
             }
         }
 
-        stage('Login to GHCR') {
+        stage('Push Images to GHCR') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'ajedhe1998',
                     usernameVariable: 'GITHUB_USER',
                     passwordVariable: 'GITHUB_TOKEN'
                 )]) {
+
                     sh '''
-                    echo $GITHUB_TOKEN | docker login $REGISTRY -u $GITHUB_USER --password-stdin
+                    echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
+
+                    docker push $IMAGE_BACKEND:$TAG
+                    docker push $IMAGE_FRONTEND:$TAG
                     '''
                 }
             }
         }
 
-        stage('Push Images to GHCR') {
-            steps {
-                sh '''
-                docker push $IMAGE_BACKEND:$TAG
-                docker push $IMAGE_FRONTEND:$TAG
-                '''
-            }
-        }
-
         stage('Deploy to EC2') {
             steps {
-                sshagent(['ec2-ssh-key']) {
-                    sh """
-                    ssh -o StrictHostKeyChecking=no ubuntu@ec2-3-227-20-198.compute-1.amazonaws.com << EOF
 
-                    cd ~/ai-chat-app
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'ajedhe1998',
+                        usernameVariable: 'GITHUB_USER',
+                        passwordVariable: 'GITHUB_TOKEN'
+                    )
+                ]) {
 
-                    echo "Logging into GHCR"
-                    echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
+                    sshagent(['ec2-ssh-key']) {
 
-                    echo "Pulling latest images"
-                    docker compose pull
+                        sh '''
+                        ssh -o StrictHostKeyChecking=no ubuntu@ec2-3-227-20-198.compute-1.amazonaws.com << EOF
 
-                    echo "Restarting containers"
-                    docker compose down
-                    docker compose up -d
+                        cd ~/ai-chat-app
 
-                    docker ps
+                        echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
 
-                    EOF
-                    """
+                        docker compose pull
+                        docker compose down
+                        docker compose up -d
+
+                        EOF
+                        '''
+                    }
                 }
             }
-        }
+     }
 
         stage('Cleanup') {
             steps {
