@@ -36,9 +36,9 @@ pipeline {
         stage('Login to GHCR') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'github-ghcr-creds',
-                    usernameVariable: 'GH_USER',
-                    passwordVariable: 'GH_TOKEN'
+                    credentialsId: 'ajedh1998',
+                    usernameVariable: 'GITHUB_USER',
+                    passwordVariable: 'GITHUB_TOKEN'
                 )]) {
                     sh '''
                     echo $GH_TOKEN | docker login $REGISTRY -u $GH_USER --password-stdin
