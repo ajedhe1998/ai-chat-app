@@ -56,6 +56,32 @@ pipeline {
             }
         }
 
+        stage('Deploy to EC2') {
+            steps {
+                sshagent(['ec2-ssh-key']) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ubuntu@ec2-3-227-20-198.compute-1.amazonaws.com << EOF
+
+                    docker login ghcr.io -u $GITHUB_USER -p $GITHUB_TOKEN
+
+                    docker pull ghcr.io/ajedhe1998/ai-chat-backend:latest
+                    docker pull ghcr.io/ajedhe1998/ai-chat-frontend:latest
+
+                    docker stop backend || true
+                    docker rm backend || true
+
+                    docker stop frontend || true
+                    docker rm frontend || true
+
+                    docker run -d -p 8000:8000 --name backend ghcr.io/ajedhe1998/ai-chat-backend:latest
+                    docker run -d -p 3000:3000 --name frontend ghcr.io/ajedhe1998/ai-chat-frontend:latest
+
+                    EOF
+                    """
+                }
+            }
+        }
+
         stage('Cleanup') {
             steps {
                 sh '''
