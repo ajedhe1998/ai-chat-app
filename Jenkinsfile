@@ -1,43 +1,76 @@
-
 pipeline {
     agent any
 
     environment {
-        IMAGE_BACKEND = "yourdockerhub/ai-chat-backend"
-        IMAGE_FRONTEND = "yourdockerhub/ai-chat-frontend"
+        REGISTRY = "ghcr.io"
+        GITHUB_USER = "ajedhe1998"
+        IMAGE_BACKEND = "ghcr.io/ajedhe1998/ai-chat-backend"
+        IMAGE_FRONTEND = "ghcr.io/ajedhe1998/ai-chat-frontend"
+        TAG = "latest"
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Build Backend') {
+        stage('Build Backend Image') {
             steps {
-                sh 'docker build -t $IMAGE_BACKEND ./backend'
+                sh '''
+                docker build -t $IMAGE_BACKEND:$TAG ./backend
+                '''
             }
         }
 
-        stage('Build Frontend') {
+        stage('Build Frontend Image') {
             steps {
-                sh 'docker build -t $IMAGE_FRONTEND ./frontend'
+                sh '''
+                docker build -t $IMAGE_FRONTEND:$TAG ./frontend
+                '''
             }
         }
 
-        stage('Push Images') {
+        stage('Login to GHCR') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
+                    credentialsId: 'github-ghcr-creds',
+                    usernameVariable: 'GH_USER',
+                    passwordVariable: 'GH_TOKEN'
                 )]) {
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
-                    sh 'docker push $IMAGE_BACKEND'
-                    sh 'docker push $IMAGE_FRONTEND'
+                    sh '''
+                    echo $GH_TOKEN | docker login $REGISTRY -u $GH_USER --password-stdin
+                    '''
                 }
             }
+        }
+
+        stage('Push Images to GHCR') {
+            steps {
+                sh '''
+                docker push $IMAGE_BACKEND:$TAG
+                docker push $IMAGE_FRONTEND:$TAG
+                '''
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                sh '''
+                docker system prune -f
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Images successfully built and pushed to GHCR 🚀"
+        }
+        failure {
+            echo "Pipeline failed ❌"
         }
     }
 }
