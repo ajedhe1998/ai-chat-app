@@ -62,19 +62,19 @@ pipeline {
                     sh """
                     ssh -o StrictHostKeyChecking=no ubuntu@ec2-3-227-20-198.compute-1.amazonaws.com << EOF
 
-                    docker login ghcr.io -u $GITHUB_USER -p $GITHUB_TOKEN
+                    cd ~/ai-chat-app
 
-                    docker pull ghcr.io/ajedhe1998/ai-chat-backend:latest
-                    docker pull ghcr.io/ajedhe1998/ai-chat-frontend:latest
+                    echo "Logging into GHCR"
+                    echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
 
-                    docker stop backend || true
-                    docker rm backend || true
+                    echo "Pulling latest images"
+                    docker compose pull
 
-                    docker stop frontend || true
-                    docker rm frontend || true
+                    echo "Restarting containers"
+                    docker compose down
+                    docker compose up -d
 
-                    docker run -d -p 8000:8000 --name backend ghcr.io/ajedhe1998/ai-chat-backend:latest
-                    docker run -d -p 3000:3000 --name frontend ghcr.io/ajedhe1998/ai-chat-frontend:latest
+                    docker ps
 
                     EOF
                     """
