@@ -1,0 +1,73 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION = "us-east-1"
+        AWS_ACCOUNT_ID = "239013465339"
+
+        ECR_BACKEND = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ai-chat-backend"
+        ECR_FRONTEND = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ai-chat-frontend"
+
+        TAG = "${BUILD_NUMBER}"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Backend Image') {
+            steps {
+                sh 'docker build -t $ECR_BACKEND:$TAG ./backend'
+            }
+        }
+
+        stage('Build Frontend Image') {
+            steps {
+                sh 'docker build -t $ECR_FRONTEND:$TAG ./frontend'
+            }
+        }
+
+        stage('Login to ECR') {
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: 'aws-credentials']
+                ]) {
+                    sh '''
+                    aws ecr get-login-password --region $AWS_REGION | \
+                    docker login --username AWS --password-stdin \
+                    $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+                    '''
+                }
+            }
+        }
+
+        stage('Push Images to ECR') {
+            steps {
+                sh '''
+                docker push $ECR_BACKEND:$TAG
+                docker push $ECR_FRONTEND:$TAG
+                '''
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                sh 'docker system prune -f'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Images successfully pushed to ECR 🚀"
+        }
+        failure {
+            echo "Pipeline failed ❌"
+        }
+    }
+}
