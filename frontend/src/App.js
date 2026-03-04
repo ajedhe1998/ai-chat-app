@@ -16,7 +16,7 @@ function App() {
     setLoading(true);
 
     try {
-      const res = await axios.post("http://ec2-3-227-20-198.compute-1.amazonaws.com:8000/chat", {
+      const res = await axios.post("http://localhost:8000/chat", {
         message: message,
       });
 
