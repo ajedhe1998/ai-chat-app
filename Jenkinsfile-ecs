@@ -2,13 +2,16 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = "us-east-1"
+        AWS_REGION     = "us-east-1"
         AWS_ACCOUNT_ID = "239013465339"
 
-        ECR_BACKEND = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ai-chat-backend"
+        ECR_BACKEND  = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ai-chat-backend"
         ECR_FRONTEND = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ai-chat-frontend"
 
         TAG = "${BUILD_NUMBER}"
+
+        ECS_CLUSTER = "ai-chat-cluster"
+        ECS_SERVICE = "ai-chat-service"
     }
 
     stages {
@@ -21,13 +24,19 @@ pipeline {
 
         stage('Build Backend Image') {
             steps {
-                sh 'docker build -t $ECR_BACKEND:$TAG ./backend'
+                sh '''
+                docker build -t $ECR_BACKEND:$TAG ./backend
+                docker tag $ECR_BACKEND:$TAG $ECR_BACKEND:latest
+                '''
             }
         }
 
         stage('Build Frontend Image') {
             steps {
-                sh 'docker build -t $ECR_FRONTEND:$TAG ./frontend'
+                sh '''
+                docker build -t $ECR_FRONTEND:$TAG ./frontend
+                docker tag $ECR_FRONTEND:$TAG $ECR_FRONTEND:latest
+                '''
             }
         }
 
@@ -50,8 +59,44 @@ pipeline {
             steps {
                 sh '''
                 docker push $ECR_BACKEND:$TAG
+                docker push $ECR_BACKEND:latest
+
                 docker push $ECR_FRONTEND:$TAG
+                docker push $ECR_FRONTEND:latest
                 '''
+            }
+        }
+
+        stage('Deploy to ECS') {
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: 'aws-credentials']
+                ]) {
+                    sh '''
+                    aws ecs update-service \
+                      --cluster $ECS_CLUSTER \
+                      --service $ECS_SERVICE \
+                      --force-new-deployment \
+                      --region $AWS_REGION
+                    '''
+                }
+            }
+        }
+
+        stage('Wait for ECS Stability') {
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: 'aws-credentials']
+                ]) {
+                    sh '''
+                    aws ecs wait services-stable \
+                      --cluster $ECS_CLUSTER \
+                      --services $ECS_SERVICE \
+                      --region $AWS_REGION
+                    '''
+                }
             }
         }
 
@@ -64,10 +109,10 @@ pipeline {
 
     post {
         success {
-            echo "Images successfully pushed to ECR 🚀"
+            echo "Images pushed and ECS deployment completed successfully"
         }
         failure {
-            echo "Pipeline failed ❌"
+            echo "Pipeline failed"
         }
     }
 }
