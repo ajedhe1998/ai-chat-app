@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+
 function App() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
@@ -16,7 +18,7 @@ function App() {
     setLoading(true);
 
     try {
-      const res = await axios.post("http://localhost:8000/chat", {
+      const res = await axios.post(`${API_BASE_URL}/chat`, {
         message: message,
       });
 

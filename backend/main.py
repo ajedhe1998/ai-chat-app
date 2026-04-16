@@ -1,35 +1,82 @@
-from fastapi import FastAPI
+import os
+from pathlib import Path
+
+import requests
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-import requests
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 app = FastAPI()
 
-# ✅ ADD THIS CORS BLOCK
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-OLLAMA_URL = "http://172.17.0.1:11434/api/generate"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    f"{GEMINI_MODEL}:generateContent"
+)
 
 class ChatRequest(BaseModel):
     message: str
 
-@app.post("/chat")
-def chat(request: ChatRequest):
+
+def generate_gemini_reply(message: str) -> str:
+    if not GEMINI_API_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="GEMINI_API_KEY is not set on the backend.",
+        )
+
     payload = {
-        "model": "tinyllama",
-        "prompt": request.message,
-        "stream": False   # 🔥 VERY IMPORTANT
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": message}],
+            }
+        ],
     }
 
-    response = requests.post(OLLAMA_URL, json=payload)
+    response = requests.post(
+        GEMINI_URL,
+        headers={"x-goog-api-key": GEMINI_API_KEY},
+        json=payload,
+        timeout=30,
+    )
+
+    if not response.ok:
+        raise HTTPException(
+            status_code=response.status_code,
+            detail=f"Gemini API error: {response.text}",
+        )
 
     data = response.json()
-    print("OLLAMA RESPONSE:", data)  # temporary debug
 
-    return {"reply": data.get("response", "No response from model")}
+    candidates = data.get("candidates", [])
+    if not candidates:
+        return "No response from Gemini."
+
+    content = candidates[0].get("content", {})
+    parts = content.get("parts", [])
+    if not parts:
+        return "No response from Gemini."
+
+    return parts[0].get("text", "No response from Gemini.")
+
+
+@app.post("/chat")
+def chat(request: ChatRequest):
+    reply = generate_gemini_reply(request.message)
+    return {"reply": reply}
