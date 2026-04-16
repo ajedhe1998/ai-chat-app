@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://ai-chat-alb-538631135.us-east-1.elb.amazonaws.com";
 
 function App() {
   const [message, setMessage] = useState("");
